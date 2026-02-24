@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lastfm-playing",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-24",
+  "vars": {
+    "ALLOWED_USERS": "twangodev",
+    "CORS_ORIGIN": "*",
+    "CACHE_TTL": "30"
+  }
+}

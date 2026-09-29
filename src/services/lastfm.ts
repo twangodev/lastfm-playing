@@ -38,17 +38,25 @@ export async function fetchRecentTracks(
     redirect: "error",
   });
   const retryAfter = retryAfterSeconds(response.headers.get("Retry-After"));
-  if (!response.ok)
+  if (!response.ok) {
+    console.warn("Last.fm HTTP error", { status: response.status });
     throw new LastfmError(response.status === 429 ? 429 : 502, retryAfter);
+  }
 
   const body: unknown = await response.json();
   const failure = lastfmErrorSchema.safeParse(body);
   if (failure.success) {
+    console.warn("Last.fm API error", { code: failure.data.error });
     const status =
       failure.data.error === 29 ? 429 : failure.data.error === 6 ? 404 : 502;
     throw new LastfmError(status, retryAfter);
   }
   const result = recentTracksSchema.safeParse(body);
-  if (!result.success) throw new LastfmError(502);
+  if (!result.success) {
+    console.warn("Invalid Last.fm response", {
+      issues: result.error.issues.map(({ code, path }) => ({ code, path })),
+    });
+    throw new LastfmError(502);
+  }
   return result.data.recenttracks.track;
 }

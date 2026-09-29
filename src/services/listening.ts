@@ -65,6 +65,11 @@ export class ListeningService {
     try {
       tracks = await fetchRecentTracks(username, this.env.LASTFM_API_KEY);
     } catch (error) {
+      if (!(error instanceof LastfmError)) {
+        console.warn("Last.fm fetch failed", {
+          name: error instanceof Error ? error.name : "UnknownError",
+        });
+      }
       return this.upstreamFailure(username, cached, cooldown, error);
     }
 

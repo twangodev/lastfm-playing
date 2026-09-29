@@ -38,7 +38,10 @@ beforeEach(() => {
   env = { ...(bindings as Env["Bindings"]), LASTFM_RATE_LIMITER: { limit } };
   upstream = vi
     .spyOn(globalThis, "fetch")
-    .mockImplementation(async () => Response.json(payload));
+    .mockImplementation(async (input, init) => {
+      new Request(input, init);
+      return Response.json(payload);
+    });
 });
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -246,4 +249,17 @@ it("preserves a usable stale result when cooldown persistence fails", async () =
     stale: true,
     observed_at: first.body.observed_at,
   });
+});
+
+it("rejects upstream redirects without following them", async () => {
+  upstream.mockImplementationOnce(async (input, init) => {
+    const request = new Request(input, init);
+    expect(request.redirect).toBe("manual");
+    return new Response(null, {
+      status: 302,
+      headers: { Location: "https://example.com/" },
+    });
+  });
+  expect((await playing("alice")).status).toBe(502);
+  expect(upstream).toHaveBeenCalledTimes(1);
 });

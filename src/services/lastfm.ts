@@ -35,7 +35,7 @@ export async function fetchRecentTracks(
   }).toString();
   const response = await fetch(url, {
     signal: AbortSignal.timeout(8000),
-    redirect: "error",
+    redirect: "manual",
   });
   const retryAfter = retryAfterSeconds(response.headers.get("Retry-After"));
   if (!response.ok) {

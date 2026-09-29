@@ -3,6 +3,11 @@
   "name": "lastfm-playing",
   "main": "src/index.ts",
   "compatibility_date": "2026-02-24",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "redact_query_string": true,
+  },
   "ratelimits": [
     {
       "name": "LASTFM_RATE_LIMITER",

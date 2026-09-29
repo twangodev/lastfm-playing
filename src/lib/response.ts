@@ -1,4 +1,4 @@
-import type { LastfmTrack } from "../types/lastfm";
+import type { LastfmTrack } from "../schemas/lastfm";
 
 export interface NowPlayingResponse {
   status: "playing" | "idle";
@@ -19,7 +19,7 @@ export interface NowPlayingResponse {
 
 export function shapeResponse(
   username: string,
-  tracks: LastfmTrack[]
+  tracks: LastfmTrack[],
 ): NowPlayingResponse {
   const first = tracks[0];
 

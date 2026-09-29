@@ -1,27 +1,54 @@
-import type {
-  LastfmRecentTracksResponse,
-  LastfmErrorResponse,
-} from "../types/lastfm";
+import {
+  recentTracksSchema,
+  lastfmErrorSchema,
+  type LastfmTrack,
+} from "../schemas/lastfm";
 
-const BASE_URL = "https://ws.audioscrobbler.com/2.0/";
-
-export async function fetchNowPlaying(
-  username: string,
-  apiKey: string
-): Promise<LastfmRecentTracksResponse | LastfmErrorResponse> {
-  const url = new URL(BASE_URL);
-  url.searchParams.set("method", "user.getrecenttracks");
-  url.searchParams.set("user", username);
-  url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-
-  if (!response.ok || "error" in (data as object)) {
-    return data as LastfmErrorResponse;
+export class LastfmError extends Error {
+  constructor(
+    public status: 404 | 429 | 502,
+    public retryAfter = 60,
+  ) {
+    super("Last.fm request failed");
   }
+}
 
-  return data as LastfmRecentTracksResponse;
+function retryAfterSeconds(header: string | null): number {
+  if (!header) return 60;
+  const seconds = /^\d+$/.test(header)
+    ? Number(header)
+    : (Date.parse(header) - Date.now()) / 1000;
+  return Number.isFinite(seconds) ? Math.max(60, Math.ceil(seconds)) : 60;
+}
+
+export async function fetchRecentTracks(
+  username: string,
+  apiKey: string,
+): Promise<LastfmTrack[]> {
+  const url = new URL("https://ws.audioscrobbler.com/2.0/");
+  url.search = new URLSearchParams({
+    method: "user.getrecenttracks",
+    user: username,
+    api_key: apiKey,
+    format: "json",
+    limit: "1",
+  }).toString();
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
+    redirect: "error",
+  });
+  const retryAfter = retryAfterSeconds(response.headers.get("Retry-After"));
+  if (!response.ok)
+    throw new LastfmError(response.status === 429 ? 429 : 502, retryAfter);
+
+  const body: unknown = await response.json();
+  const failure = lastfmErrorSchema.safeParse(body);
+  if (failure.success) {
+    const status =
+      failure.data.error === 29 ? 429 : failure.data.error === 6 ? 404 : 502;
+    throw new LastfmError(status, retryAfter);
+  }
+  const result = recentTracksSchema.safeParse(body);
+  if (!result.success) throw new LastfmError(502);
+  return result.data.recenttracks.track;
 }

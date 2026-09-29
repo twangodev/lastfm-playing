@@ -31,13 +31,13 @@ app.onError((err, c) => {
   console.error("Unhandled error:", err);
   return c.json(
     { error: "internal_error", message: "An unexpected error occurred." },
-    500
+    500,
   );
 });
 
 // 404 fallback
 app.notFound((c) =>
-  c.json({ error: "not_found", message: "Route not found." }, 404)
+  c.json({ error: "not_found", message: "Route not found." }, 404),
 );
 
 export default app;

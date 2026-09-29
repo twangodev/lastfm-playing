@@ -12,7 +12,7 @@ A lightweight Cloudflare Worker that exposes a user's currently playing Last.fm 
 
 ### `GET /playing/:username`
 
-Returns the currently playing (or most recently played) track for an allowlisted Last.fm user.
+Returns the currently playing track for a Last.fm user. Public usernames are enabled by default; `ALLOWED_USERS` can restrict access.
 
 **Response:**
 
@@ -20,6 +20,8 @@ Returns the currently playing (or most recently played) track for an allowlisted
 {
   "status": "playing",
   "user": "twangodev",
+  "observed_at": "2026-09-28T23:00:00.000Z",
+  "stale": false,
   "track": {
     "name": "Redbone",
     "artist": "Childish Gambino",
@@ -65,11 +67,11 @@ LASTFM_API_KEY=your_api_key_here
 
 Adjust the public variables in `wrangler.jsonc` as needed:
 
-| Variable        | Description                                         | Default     |
-|-----------------|-----------------------------------------------------|-------------|
-| `ALLOWED_USERS` | Comma-separated list of permitted Last.fm usernames | `twangodev` |
-| `CORS_ORIGIN`   | Allowed CORS origin(s)                              | `*`         |
-| `CACHE_TTL`     | Cache duration in seconds                           | `30`        |
+| Variable        | Description                                         | Default         |
+| --------------- | --------------------------------------------------- | --------------- |
+| `ALLOWED_USERS` | Comma-separated list of permitted Last.fm usernames | `*` (all users) |
+| `CORS_ORIGIN`   | Allowed CORS origin(s)                              | `*`             |
+| `CACHE_TTL`     | Cache duration in seconds (clamped to 30–60)        | `30`            |
 
 ### Development
 
@@ -90,3 +92,43 @@ Then deploy:
 ```sh
 pnpm deploy
 ```
+
+## Cache and rate limiting
+
+Cloudflare's native rate-limiting binding allows five upstream requests per ten
+seconds, using one key shared by all usernames **within each Cloudflare location**.
+It is an approximate regional limit, can allow bursts, and is not a global quota.
+No Durable Object or database is required.
+
+Fresh cached results bypass the limiter. The Cache API stores each username's
+response locally for up to two minutes; results are refreshed after 30 seconds
+by default. Concurrent requests for the same username share one fetch within a
+Worker isolate. Separate isolates and regions can still make separate requests.
+
+When the limit is reached or Last.fm fails, the service may return cached data
+with `stale: true`. `observed_at` remains the time of the last successful upstream
+fetch. Clients must stop displaying it two minutes after that timestamp. With
+no usable cache, the endpoint returns HTTP 429 or 502 and `Retry-After`.
+
+Upstream failures create a regional cooldown in the Cache API, with increasing
+backoff and support for upstream `Retry-After`. Cache entries can be evicted and
+concurrent writes are not coordinated, so cooldowns are best effort. The native
+rate limiter remains the request gate when no cache entry exists. Cache failures
+are logged separately and do not discard a valid upstream response or count as
+Last.fm failures.
+
+Zod schemas validate Last.fm responses before caching them. Unexpected responses
+produce errors instead of a false idle status. Start times and loved-track status
+are not provided by this endpoint.
+
+## Validation and rollout
+
+```sh
+pnpm check
+pnpm test
+pnpm exec wrangler deploy --dry-run
+```
+
+Keep the existing `LASTFM_API_KEY` secret. Deploy this service before releasing
+clients that require `observed_at`; the old response has no freshness metadata.
+Integration tests mock Last.fm and exercise the native binding locally.

@@ -4,14 +4,19 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "test": "vitest run",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.12.2"
+    "hono": "^4.12.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260303.0",
+    "@cloudflare/vitest-plugin": "^1.3.0",
+    "@cloudflare/workers-types": "^5.20260927.1",
     "typescript": "^5.9.3",
-    "wrangler": "^4.4.0"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.142.0"
   }
 }
